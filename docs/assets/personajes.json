@@ -1,0 +1,154 @@
+[
+  {
+    "id": "alexandre",
+    "nombre": "Alexandre",
+    "clan": "Ventrue",
+    "generacion": 4,
+    "status": "Destruido",
+    "descripcion": "Ventrue de 4ta Generación, ex-Príncipe de París. Destruido y diablerizado por Qarakh de Gangrel en 1232.",
+    "organizacion": [
+      "Camarilla"
+    ],
+    "aliases": [
+      "Alexander",
+      "Alexander de París"
+    ],
+    "imagen": "assets/img/Retrato desconocido.png"
+  },
+  {
+    "id": "amelia-de-cordoba",
+    "nombre": "Amelia de Cordoba",
+    "clan": "Tremere",
+    "generacion": 7,
+    "status": "Primogénita de los Tremere en Toledo",
+    "descripcion": "Erudita de los arcanos, líder del clan Tremere en Toledo.",
+    "organizacion": [
+      "Camarilla",
+      "Primogenitura de Toledo"
+    ],
+    "aliases": [],
+    "imagen": "assets/img/Amelia de Cordoba - Portrait.png"
+  },
+  {
+    "id": "andrei-dominka",
+    "nombre": "Andrei Dominka",
+    "clan": "Brujah",
+    "generacion": 8,
+    "status": "Primogenito",
+    "descripcion": "Primogenito Brujah de Buenos Aires, aliado con los Anarquistas e Independientes.",
+    "organizacion": [
+      "Primogenitura de Buenos Aires",
+      "Anarquistas"
+    ],
+    "aliases": [],
+    "imagen": "assets/img/Andrei Dominka - Portrait 2.png"
+  },
+  {
+    "id": "arturo-mendoza",
+    "nombre": "Arturo Mendoza",
+    "clan": "Lasombra",
+    "generacion": 7,
+    "status": "Primogénito Lasombra de Toledo",
+    "descripcion": "Primogénito Lasombra de Toledo, diplomático intrigante con secretos oscuros.",
+    "organizacion": [
+      "Camarilla",
+      "Principado de Toledo"
+    ],
+    "aliases": [
+      "El Sombra",
+      "El Caballero Oscuro"
+    ],
+    "imagen": "assets/img/Arturo Mendoza - Portrait.png"
+  },
+  {
+    "id": "augusto-gravita",
+    "nombre": "Augusto Gravita",
+    "clan": "Gangrel",
+    "generacion": 13,
+    "status": "Vigía de Andrei Dominka",
+    "descripcion": "Neonato Gangrel al servicio de Andrei Dominka. Eternamente adolescente, disperso e irritantemente observador de boludeces. Le dicen Anchoita.",
+    "organizacion": [
+      "Anarquistas"
+    ],
+    "aliases": [
+      "Anchoita"
+    ],
+    "imagen": "assets/img/Augusto Gravita - Retrato.png"
+  },
+  {
+    "id": "basarab",
+    "nombre": "Basarab",
+    "clan": "Tzimisce",
+    "generacion": 6,
+    "status": "Arzobispo de Valaquia",
+    "descripcion": "Antiguo Tzimisce de 6ta Generación, Arzobispo de Valaquia. Chiquillo de Koschei, se cuela en los sueños de Maurice Durand tras que este bebiera su Vitae.",
+    "organizacion": [
+      "Sabbat"
+    ],
+    "aliases": [
+      "Voivoda",
+      "El Voivoda",
+      "Arzobispo de Valaquia",
+      "La Niebla de los Carpatos"
+    ],
+    "imagen": "assets/img/Basarab Portrait.png"
+  },
+  {
+    "id": "belmont-faure",
+    "nombre": "Belmont Faure",
+    "clan": "Ventrue",
+    "generacion": 9,
+    "status": "De nuevo en Buenos Aires maquinando con el Clan.",
+    "descripcion": "Ventrue de Buenos Aires, Sire de Maurice Durand. Maquinando para posicionar al General Matorras como Príncipe.",
+    "organizacion": [
+      "Camarilla"
+    ],
+    "aliases": [],
+    "imagen": "assets/img/Belmont Faure - Potrait.png"
+  },
+  {
+    "id": "carlotta-forzanotte",
+    "nombre": "Carlotta Forzanotte",
+    "clan": "Malkavian",
+    "generacion": 10,
+    "status": "Aislada",
+    "descripcion": "Abuela de Lorenzo Forzanotte, abrazada siendo anciana. Perdió la memoria y vive aislada en Villa Rivotti, Italia.",
+    "organizacion": [
+      "Independientes"
+    ],
+    "aliases": [
+      "La Nona",
+      "Carlotta",
+      "Strega della Cappella"
+    ],
+    "imagen": "assets/img/Carlotta Forzanotte - Portrait.png"
+  },
+  {
+    "id": "chevalier-d-eglantine",
+    "nombre": "Chevalier d'Eglantine",
+    "clan": "Toreador",
+    "generacion": 8,
+    "status": "Lider Sheriff",
+    "descripcion": "Lider de Les Masques, en Paris",
+    "organizacion": [
+      "Camarilla",
+      "Conceil de Guerre",
+      "Les Masques"
+    ],
+    "aliases": [],
+    "imagen": "assets/img/Chevalier d'EglantinePortrait.png"
+  },
+  {
+    "id": "codrina-moldevenou",
+    "nombre": "Codrina Moldevenou",
+    "clan": "Gangrel",
+    "generacion": null,
+    "status": "Aliada de la Cuadrilla",
+    "descripcion": "Gangrel Autarkis rumana, diablerista de Shaila.",
+    "organizacion": [
+      "Autarkis"
+    ],
+    "aliases": [],
+    "imagen": "assets/img/Codrina Portrait.png"
+  }
+]

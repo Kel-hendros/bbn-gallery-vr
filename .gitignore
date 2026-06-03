@@ -1,0 +1,15 @@
+# Dependencias
+node_modules/
+
+# Certificados locales (HTTPS de testeo) — NO publicar
+certs/
+
+# Copias locales de los .md del vault (notas completas de PNJs) — fuera del repo público
+data/
+
+# Cruft de macOS
+.DS_Store
+**/.DS_Store
+
+# Logs de tareas en background
+*.output
