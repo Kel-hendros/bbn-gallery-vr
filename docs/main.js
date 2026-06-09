@@ -5,12 +5,13 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { buildScene, buildDust, makeSpotlight, loadPanorama, SANGRE } from "./scene.js";
 import { PersonajeCard } from "./personaje-card.js";
 import { XRControls } from "./xr-controller.js";
+import { WolverineClaws } from "./hand-claws.js";
 
 const GAZE_DWELL = 1.5; // segundos mirando para abrir
 const EYE_HEIGHT = 1.6;
 const RING_RADIUS = 4.2;
 
-let renderer, scene, camera, dolly, xrControls, dust;
+let renderer, scene, camera, dolly, xrControls, dust, handClaws;
 let cards = [];
 let raycaster, reticle, reticleFill;
 let hoverCard = null, activeCard = null, dwell = 0;
@@ -28,7 +29,11 @@ async function init() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
-  document.body.appendChild(VRButton.createButton(renderer));
+  document.body.appendChild(
+    VRButton.createButton(renderer, {
+      optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"],
+    })
+  );
 
   scene = buildScene();
   loadPanorama(scene, "assets/img/Buenos aires 360.png");
@@ -53,6 +58,9 @@ async function init() {
   xrControls = new XRControls(renderer, dolly, camera);
   xrControls.onSelect = () => { if (hoverCard) openCard(hoverCard); };
   xrControls.onCancel = () => closeActive();
+
+  // Hand tracking: al cerrar el puño surgen garras estilo Wolverine.
+  handClaws = new WolverineClaws(renderer, dolly, scene);
 
   setupDesktopControls();
   window.addEventListener("resize", onResize);
@@ -191,6 +199,7 @@ function animate() {
 
   if (renderer.xr.isPresenting) {
     xrControls.update(dt);
+    if (handClaws) handClaws.update(dt);
   } else {
     updateDesktop(dt);
   }

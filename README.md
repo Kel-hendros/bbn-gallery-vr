@@ -16,6 +16,8 @@ del Quest**, entrá a la URL de Pages del repo y tocá **"Enter VR"**.
 ### Controles
 - **Joystick izquierdo:** moverse · **Joystick derecho:** girar en snaps de 45°
 - **Mirar fijo 1,5 s** (gaze dwell) o **botón A:** abre la ficha · **botón B:** la cierra
+- **Manos (hand tracking):** soltá los controles y mostrá las manos; **cerrá el
+  puño** y te salen garras de acero estilo Wolverine. Abrí la mano para guardarlas.
 - **Sin visor (escritorio, para testear):** arrastrar para mirar, **WASD** para moverse
 
 ## Estructura
@@ -26,7 +28,7 @@ bbn-gallery-vr/
 ├── data/personajes/      ← copias locales de los .md (NO se publican; .gitignore)
 └── docs/                 ← el sitio estático que publica GitHub Pages
     ├── index.html
-    ├── main.js · scene.js · personaje-card.js · xr-controller.js
+    ├── main.js · scene.js · personaje-card.js · xr-controller.js · hand-claws.js
     └── assets/
         ├── personajes.json
         └── img/          ← retratos + panorama 360
