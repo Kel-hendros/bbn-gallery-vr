@@ -85,23 +85,50 @@ export class WolverineClaws {
     });
 
     // Tres garras paralelas sobre los nudillos. La del medio, más larga.
-    const lengths = [0.20, 0.245, 0.20];
+    const lengths = [0.21, 0.25, 0.21];
     const xs = [-0.024, 0.0, 0.024];
     const splay = [-0.1, 0.0, 0.1]; // leve abanico hacia afuera
 
     for (let k = 0; k < 3; k++) {
-      const len = lengths[k];
-      // Cono fino: base en el origen, punta hacia +Z (dirección de los dedos).
-      const geo = new THREE.ConeGeometry(0.0055, len, 14);
-      geo.translate(0, len / 2, 0); // base en y=0, crece hacia +Y
-      geo.rotateX(Math.PI / 2);     // ahora la punta apunta a +Z
-      const blade = new THREE.Mesh(geo, steel);
+      const blade = new THREE.Mesh(this._bladeGeometry(lengths[k]), steel);
       blade.position.set(xs[k], 0, 0);
       blade.rotation.y = splay[k];
       group.add(blade);
     }
 
     return group;
+  }
+
+  /**
+   * Hoja estilo cuchilla: silueta lateral 2D (largo × alto) extruida con un
+   * bisel fino que forma el filo. Queda con la base en el origen, la punta
+   * hacia +Z (dirección de los dedos) y el plano de la hoja vertical
+   * respecto del dorso de la mano — como las de Wolverine.
+   */
+  _bladeGeometry(len) {
+    const H = 0.012; // alto de la hoja en la base
+
+    // Silueta en el plano XY: X = largo, Y = alto.
+    const s = new THREE.Shape();
+    s.moveTo(0, -H * 0.45);
+    // Filo inferior: casi recto, con una caída sutil hacia la punta.
+    s.quadraticCurveTo(len * 0.55, -H * 0.5, len, -H * 0.04);
+    // Lomo superior: convexo, se afina hasta encontrarse con el filo en la punta.
+    s.quadraticCurveTo(len * 0.45, H * 0.6, 0, H * 0.55);
+    s.closePath();
+
+    const T = 0.0022; // grosor del alma de la hoja
+    const geo = new THREE.ExtrudeGeometry(s, {
+      depth: T,
+      bevelEnabled: true,   // el bisel achaflana los bordes → filo
+      bevelThickness: 0.0014,
+      bevelSize: 0.0018,
+      bevelSegments: 2,
+      curveSegments: 20,
+    });
+    geo.translate(0, 0, -T / 2); // centrar el grosor
+    geo.rotateY(-Math.PI / 2);   // largo de +X a +Z
+    return geo;
   }
 
   /**
