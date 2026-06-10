@@ -44,9 +44,15 @@ export class WolverineClaws {
 
     for (let i = 0; i < 2; i++) {
       const hand = renderer.xr.getHand(i);
-      // Modelo de mano por primitivas (esferas): se genera localmente, no
-      // depende de descargar un GLB de un CDN — si hay tracking, se ve siempre.
-      hand.add(handFactory.createHandModel(hand, "spheres"));
+      // Esferas como base (geometría local, se ven siempre que haya tracking).
+      // En paralelo se intenta cargar la malla realista de mano desde el CDN;
+      // si llega, reemplaza a las esferas. Si no llega, las esferas quedan.
+      const spheres = handFactory.createHandModel(hand, "spheres");
+      hand.add(spheres);
+      const meshFactory = new XRHandModelFactory(null, () => {
+        spheres.visible = false;
+      });
+      hand.add(meshFactory.createHandModel(hand, "mesh"));
       dolly.add(hand);
 
       // El grupo de garras vive en la escena (no en la mano): cada frame le

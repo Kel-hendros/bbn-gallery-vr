@@ -12,7 +12,7 @@ const EYE_HEIGHT = 1.6;
 const RING_RADIUS = 4.2;
 const DEBUG = new URLSearchParams(location.search).has("debug");
 
-let renderer, scene, camera, dolly, xrControls, dust, handClaws, debugHud;
+let renderer, scene, camera, dolly, xrControls, dust, handClaws, debugHud, debugButton;
 let cards = [];
 let raycaster, reticle, reticleFill;
 let hoverCard = null, activeCard = null, dwell = 0;
@@ -63,8 +63,10 @@ async function init() {
   // Hand tracking: al cerrar el puño surgen garras estilo Wolverine.
   handClaws = new WolverineClaws(renderer, dolly, scene);
 
-  // HUD de diagnóstico en VR (agregar ?debug a la URL para activarlo).
-  if (DEBUG) debugHud = buildDebugHud();
+  // HUD de diagnóstico: arranca visible si la URL trae ?debug, y se puede
+  // prender/apagar en VR con el botón flotante "DEBUG".
+  debugHud = buildDebugHud();
+  debugButton = buildDebugButton();
 
   setupDesktopControls();
   window.addEventListener("resize", onResize);
@@ -94,6 +96,7 @@ function buildReticle() {
 
 function setReticleProgress(p) {
   // Redibuja el anillo de relleno según progreso 0..1.
+  p = Math.max(0, Math.min(1, p));
   reticleFill.geometry.dispose();
   reticleFill.geometry = new THREE.RingGeometry(0.013, 0.02, 32, 1, -Math.PI / 2, p * Math.PI * 2);
 }
@@ -162,6 +165,7 @@ function updateGaze(dt) {
   raycaster.far = 12;
 
   const meshes = cards.map((c) => c.portrait);
+  if (debugButton) meshes.push(debugButton.mesh);
   const hits = raycaster.intersectObjects(meshes, false);
   const hit = hits.length ? hits[0].object.userData.card : null;
 
@@ -185,6 +189,14 @@ function updateGaze(dt) {
 }
 
 function openCard(card) {
+  // El botón de debug no es una card: solo alterna el HUD.
+  if (card.isDebugButton) {
+    toggleDebug();
+    // Dwell muy negativo: no vuelve a disparar hasta sacar la mirada del botón.
+    dwell = -999;
+    setReticleProgress(0);
+    return;
+  }
   if (activeCard && activeCard !== card) activeCard.close();
   activeCard = card;
   card.open();
@@ -204,10 +216,11 @@ function animate() {
   if (renderer.xr.isPresenting) {
     xrControls.update(dt);
     if (handClaws) handClaws.update(dt);
-    if (debugHud) debugHud.update(t);
   } else {
     updateDesktop(dt);
   }
+
+  if (debugHud && debugHud.mesh.visible) debugHud.update(t);
 
   updateGaze(dt);
   for (const c of cards) c.update(dt, t);
@@ -252,6 +265,54 @@ function updateDesktop(dt) {
   }
 }
 
+// ---------- Botón flotante para prender/apagar el HUD de debug ----------
+function toggleDebug() {
+  debugHud.mesh.visible = !debugHud.mesh.visible;
+  debugButton.draw();
+}
+
+function buildDebugButton() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 96;
+  const ctx = canvas.getContext("2d");
+  const tex = new THREE.CanvasTexture(canvas);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.34, 0.13),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true })
+  );
+  // Abajo y al frente, por debajo del anillo de retratos.
+  mesh.position.set(0, 0.72, -2.9);
+  scene.add(mesh);
+
+  const btn = {
+    isDebugButton: true,
+    mesh,
+    hovered: false,
+    setHover(h) {
+      this.hovered = h;
+      this.draw();
+    },
+    draw() {
+      const on = debugHud && debugHud.mesh.visible;
+      ctx.clearRect(0, 0, 256, 96);
+      ctx.fillStyle = this.hovered ? "rgba(122, 12, 18, 0.85)" : "rgba(10, 8, 6, 0.7)";
+      ctx.fillRect(0, 0, 256, 96);
+      ctx.strokeStyle = "#b8954b";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(4, 4, 248, 88);
+      ctx.fillStyle = "#d9c7a3";
+      ctx.font = "28px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`DEBUG ${on ? "ON" : "OFF"}`, 128, 58);
+      tex.needsUpdate = true;
+    },
+  };
+  mesh.userData.card = btn;
+  btn.draw();
+  return btn;
+}
+
 // ---------- HUD de debug en VR (estado del hand tracking) ----------
 function buildDebugHud() {
   const canvas = document.createElement("canvas");
@@ -265,10 +326,12 @@ function buildDebugHud() {
   );
   mesh.position.set(0, -0.18, -0.85);
   mesh.renderOrder = 998;
+  mesh.visible = DEBUG; // ?debug en la URL lo deja prendido de entrada
   camera.add(mesh);
 
   let last = 0;
   return {
+    mesh,
     update(now) {
       if (now - last < 150) return; // ~6 veces por segundo alcanza
       last = now;
