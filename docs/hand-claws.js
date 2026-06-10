@@ -49,10 +49,6 @@ export class WolverineClaws {
       // si llega, reemplaza a las esferas. Si no llega, las esferas quedan.
       const spheres = handFactory.createHandModel(hand, "spheres");
       hand.add(spheres);
-      const meshFactory = new XRHandModelFactory(null, () => {
-        spheres.visible = false;
-      });
-      hand.add(meshFactory.createHandModel(hand, "mesh"));
       dolly.add(hand);
 
       // El grupo de garras vive en la escena (no en la mano): cada frame le
@@ -60,7 +56,19 @@ export class WolverineClaws {
       const claws = this._buildClaws();
       scene.add(claws);
 
-      this.hands.push({ hand, claws, extend: 0, isFist: false, openness: null });
+      const state = {
+        hand, claws, spheres,
+        meshModel: null, meshLoaded: false, modelsVisible: true,
+        extend: 0, isFist: false, openness: null,
+      };
+      const meshFactory = new XRHandModelFactory(null, () => {
+        state.meshLoaded = true;
+        spheres.visible = false;
+      });
+      state.meshModel = meshFactory.createHandModel(hand, "mesh");
+      hand.add(state.meshModel);
+
+      this.hands.push(state);
     }
   }
 
@@ -94,6 +102,18 @@ export class WolverineClaws {
     }
 
     return group;
+  }
+
+  /**
+   * Muestra u oculta los modelos de mano virtuales (esferas/malla).
+   * En passthrough se ocultan: las garras salen de tus manos reales.
+   */
+  setHandModelsVisible(v) {
+    for (const s of this.hands) {
+      s.modelsVisible = v;
+      if (s.meshModel) s.meshModel.visible = v;
+      s.spheres.visible = v && !s.meshLoaded;
+    }
   }
 
   /** Estado por mano, para el HUD de debug. */

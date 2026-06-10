@@ -1,7 +1,6 @@
 // main.js — Entry point. Renderer + WebXR, carga de datos, disposición en anillo,
 // gaze dwell, controles de escritorio (fallback) y loop de animación.
 import * as THREE from "three";
-import { VRButton } from "three/addons/webxr/VRButton.js";
 import { buildScene, buildDust, makeSpotlight, loadPanorama, SANGRE } from "./scene.js";
 import { PersonajeCard } from "./personaje-card.js";
 import { XRControls } from "./xr-controller.js";
@@ -12,10 +11,11 @@ const EYE_HEIGHT = 1.6;
 const RING_RADIUS = 4.2;
 const DEBUG = new URLSearchParams(location.search).has("debug");
 
-let renderer, scene, camera, dolly, xrControls, dust, handClaws, debugHud, debugButton;
+let renderer, scene, camera, dolly, xrControls, dust, handClaws, debugHud, debugButton, modeButton;
 let cards = [];
 let raycaster, reticle, reticleFill;
 let hoverCard = null, activeCard = null, dwell = 0;
+let passthrough = false; // modo garras: galería oculta, se ve la habitación real
 const clock = new THREE.Clock();
 
 // Estado de controles de escritorio (fallback sin visor).
@@ -24,17 +24,16 @@ const desktop = { yaw: 0, pitch: 0, dragging: false, lastX: 0, lastY: 0, keys: {
 init();
 
 async function init() {
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
-  document.body.appendChild(
-    VRButton.createButton(renderer, {
-      optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"],
-    })
-  );
+  // Botón de entrada propio: pide sesión AR (passthrough disponible) con
+  // local-floor. VRButton/ARButton de three no sirven acá: VRButton no da
+  // passthrough y ARButton fuerza referencia 'local' (sin altura de piso).
+  setupXRButton();
 
   scene = buildScene();
   loadPanorama(scene, "assets/img/Buenos aires 360.png");
@@ -47,8 +46,8 @@ async function init() {
   camera.position.set(0, EYE_HEIGHT, 0);
   scene.add(dolly);
 
-  // Polvo ambiente.
-  dust = buildDust(scene);
+  // Polvo ambiente (dentro del grupo galería: se oculta en passthrough).
+  dust = buildDust(scene.userData.gallery);
 
   // Retícula de gaze, anclada frente a la cámara.
   buildReticle();
@@ -67,6 +66,9 @@ async function init() {
   // prender/apagar en VR con el botón flotante "DEBUG".
   debugHud = buildDebugHud();
   debugButton = buildDebugButton();
+
+  // Botón central X/Ankh: alterna entre galería y modo garras (passthrough).
+  modeButton = buildModeButton();
 
   setupDesktopControls();
   window.addEventListener("resize", onResize);
@@ -145,13 +147,13 @@ function layoutCards(data) {
     const pos = new THREE.Vector3(x, y, z);
     // El frente del plano (+Z) debe apuntar al centro (origen): rotación = -angle.
     const card = new PersonajeCard(p, pos, -angle);
-    scene.add(card.group);
+    scene.userData.gallery.add(card.group);
     cards.push(card);
 
     // Foco sobre cada retrato.
     const spot = makeSpotlight(pos);
-    scene.add(spot);
-    scene.add(spot.target);
+    scene.userData.gallery.add(spot);
+    scene.userData.gallery.add(spot.target);
   });
 }
 
@@ -164,7 +166,10 @@ function updateGaze(dt) {
   raycaster.set(origin, dir);
   raycaster.far = 12;
 
-  const meshes = cards.map((c) => c.portrait);
+  // En passthrough las cards están ocultas (pero el raycaster igual las
+  // golpearía): solo se pueden mirar los botones flotantes.
+  const meshes = passthrough ? [] : cards.map((c) => c.portrait);
+  if (modeButton) meshes.push(modeButton.mesh);
   if (debugButton) meshes.push(debugButton.mesh);
   const hits = raycaster.intersectObjects(meshes, false);
   const hit = hits.length ? hits[0].object.userData.card : null;
@@ -189,10 +194,16 @@ function updateGaze(dt) {
 }
 
 function openCard(card) {
-  // El botón de debug no es una card: solo alterna el HUD.
+  // Los botones flotantes no son cards: disparan su acción y listo.
+  // Dwell muy negativo: no vuelven a disparar hasta sacar la mirada.
   if (card.isDebugButton) {
     toggleDebug();
-    // Dwell muy negativo: no vuelve a disparar hasta sacar la mirada del botón.
+    dwell = -999;
+    setReticleProgress(0);
+    return;
+  }
+  if (card.isModeButton) {
+    toggleMode();
     dwell = -999;
     setReticleProgress(0);
     return;
@@ -263,6 +274,159 @@ function updateDesktop(dt) {
     const rad = Math.hypot(dolly.position.x, dolly.position.z);
     if (rad > 10.5) { dolly.position.x *= 10.5 / rad; dolly.position.z *= 10.5 / rad; }
   }
+}
+
+// ---------- Entrada a XR (sesión AR con passthrough disponible) ----------
+function setupXRButton() {
+  const btn = document.createElement("button");
+  Object.assign(btn.style, {
+    position: "absolute", bottom: "20px", left: "50%", transform: "translateX(-50%)",
+    padding: "12px 28px", border: "1px solid #b8954b", borderRadius: "4px",
+    background: "rgba(0,0,0,0.65)", color: "#d9c7a3",
+    font: "bold 14px Cinzel, serif", letterSpacing: "0.12em",
+    cursor: "pointer", zIndex: "11", opacity: "0.9",
+  });
+  btn.textContent = "…";
+  document.body.appendChild(btn);
+
+  if (!("xr" in navigator)) {
+    btn.textContent = "WEBXR NO DISPONIBLE";
+    btn.disabled = true;
+    return;
+  }
+
+  let session = null;
+  let mode = null;
+  // Preferir AR (passthrough para el modo garras); si no hay, VR común.
+  navigator.xr.isSessionSupported("immersive-ar")
+    .then((ar) => (ar ? "immersive-ar" : navigator.xr.isSessionSupported("immersive-vr").then((vr) => (vr ? "immersive-vr" : null))))
+    .then((m) => {
+      mode = m;
+      btn.textContent = mode ? "ENTRAR AL ARCHIVO" : "VISOR NO DETECTADO";
+      btn.disabled = !mode;
+    })
+    .catch(() => {
+      mode = "immersive-vr";
+      btn.textContent = "ENTRAR AL ARCHIVO";
+    });
+
+  btn.onclick = async () => {
+    if (session) { session.end(); return; }
+    if (!mode) return;
+    try {
+      session = await navigator.xr.requestSession(mode, {
+        requiredFeatures: ["local-floor"],
+        optionalFeatures: ["bounded-floor", "hand-tracking"],
+      });
+    } catch (e) {
+      console.error("No se pudo iniciar la sesión XR", e);
+      return;
+    }
+    session.addEventListener("end", () => {
+      session = null;
+      btn.textContent = "ENTRAR AL ARCHIVO";
+    });
+    renderer.xr.setReferenceSpaceType("local-floor");
+    await renderer.xr.setSession(session);
+    btn.textContent = "SALIR";
+  };
+}
+
+// ---------- Modo garras: passthrough sin galería ----------
+function toggleMode() {
+  passthrough = !passthrough;
+  scene.userData.passthrough = passthrough;
+  scene.userData.gallery.visible = !passthrough;
+
+  if (passthrough) {
+    // Fondo transparente: el compositor del visor muestra la cámara real.
+    scene.background = null;
+    renderer.setClearColor(0x000000, 0);
+    closeActive();
+    if (hoverCard && !hoverCard.isModeButton && !hoverCard.isDebugButton) {
+      hoverCard.setHover(false);
+      hoverCard = null;
+    }
+  } else {
+    scene.background = scene.userData.panoTex || new THREE.Color(0x05030a);
+    renderer.setClearColor(0x05030a, 1);
+  }
+
+  // Sin manos virtuales en passthrough: las garras salen de tus manos reales.
+  if (handClaws) handClaws.setHandModelsVisible(!passthrough);
+  modeButton.draw();
+}
+
+function buildModeButton() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  const tex = new THREE.CanvasTexture(canvas);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.26, 0.26),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true })
+  );
+  // Centro de la escena, a media altura, delante del anillo de retratos.
+  mesh.position.set(0, 1.05, -2.0);
+  scene.add(mesh);
+
+  const btn = {
+    isModeButton: true,
+    mesh,
+    hovered: false,
+    setHover(h) {
+      this.hovered = h;
+      this.draw();
+    },
+    draw() {
+      ctx.clearRect(0, 0, 256, 256);
+      // Medallón circular de fondo.
+      ctx.beginPath();
+      ctx.arc(128, 128, 110, 0, Math.PI * 2);
+      ctx.fillStyle = this.hovered ? "rgba(46, 10, 14, 0.92)" : "rgba(10, 8, 6, 0.75)";
+      ctx.fill();
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = "#b8954b";
+      ctx.stroke();
+
+      ctx.lineCap = "round";
+      if (!passthrough) {
+        // X de tajos de garra: pasar al modo passthrough.
+        ctx.strokeStyle = this.hovered ? "#c41420" : "#7a0c12";
+        ctx.lineWidth = 13;
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(78 + i * 26, 62);
+          ctx.lineTo(126 + i * 26, 194);
+          ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.moveTo(186, 74);
+        ctx.lineTo(70, 182);
+        ctx.stroke();
+      } else {
+        // Ankh: volver a la galería.
+        ctx.strokeStyle = this.hovered ? "#e8c97a" : "#b8954b";
+        ctx.lineWidth = 16;
+        ctx.beginPath();
+        ctx.ellipse(128, 84, 30, 42, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(128, 126);
+        ctx.lineTo(128, 208);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(84, 148);
+        ctx.lineTo(172, 148);
+        ctx.stroke();
+      }
+      tex.needsUpdate = true;
+    },
+  };
+  mesh.userData.card = btn;
+  btn.draw();
+  return btn;
 }
 
 // ---------- Botón flotante para prender/apagar el HUD de debug ----------

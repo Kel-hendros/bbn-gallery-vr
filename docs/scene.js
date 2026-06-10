@@ -11,6 +11,14 @@ export function buildScene() {
   // Niebla volumétrica baja: oscurece la distancia, encierra el salón.
   scene.fog = new THREE.FogExp2(0x05030a, 0.07);
 
+  // Todo lo "galería" (suelo, retratos, focos, polvo) vive en este grupo:
+  // en modo passthrough se oculta entero. Las luces base quedan fuera para
+  // que las garras sigan iluminadas.
+  const gallery = new THREE.Group();
+  gallery.name = "gallery";
+  scene.add(gallery);
+  scene.userData.gallery = gallery;
+
   // --- Iluminación ambiental muy baja (casi negro) ---
   const ambient = new THREE.AmbientLight(0x221a2e, 0.35);
   scene.add(ambient);
@@ -29,7 +37,7 @@ export function buildScene() {
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
-  scene.add(floor);
+  gallery.add(floor);
 
   // Las paredes/techo las reemplaza el panorama 360 (loadPanorama). Si no hay
   // panorama, el background oscuro (0x05030a) + niebla alcanzan para el mood.
@@ -47,7 +55,9 @@ export function loadPanorama(scene, url, { bgIntensity = 0.32, envIntensity = 0.
   tl.load(url, (tex) => {
     tex.mapping = THREE.EquirectangularReflectionMapping;
     tex.colorSpace = THREE.SRGBColorSpace;
-    scene.background = tex;
+    scene.userData.panoTex = tex;
+    // En passthrough el fondo debe quedar transparente: no pisarlo.
+    if (!scene.userData.passthrough) scene.background = tex;
     scene.backgroundIntensity = bgIntensity;   // oscurece el skybox
     scene.environment = tex;                     // ilumina sutilmente la escena
     scene.environmentIntensity = envIntensity;
