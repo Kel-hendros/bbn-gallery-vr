@@ -44,10 +44,9 @@ export class WolverineClaws {
 
     for (let i = 0; i < 2; i++) {
       const hand = renderer.xr.getHand(i);
-      // Malla realista de la mano. Si no carga (red), las garras igual funcionan.
-      try {
-        hand.add(handFactory.createHandModel(hand, "mesh"));
-      } catch (_) {}
+      // Modelo de mano por primitivas (esferas): se genera localmente, no
+      // depende de descargar un GLB de un CDN — si hay tracking, se ve siempre.
+      hand.add(handFactory.createHandModel(hand, "spheres"));
       dolly.add(hand);
 
       // El grupo de garras vive en la escena (no en la mano): cada frame le
@@ -55,7 +54,7 @@ export class WolverineClaws {
       const claws = this._buildClaws();
       scene.add(claws);
 
-      this.hands.push({ hand, claws, extend: 0, isFist: false });
+      this.hands.push({ hand, claws, extend: 0, isFist: false, openness: null });
     }
   }
 
@@ -91,6 +90,16 @@ export class WolverineClaws {
     return group;
   }
 
+  /** Estado por mano, para el HUD de debug. */
+  status() {
+    return this.hands.map((s) => ({
+      tracked: !!(s.hand.joints && s.hand.joints["wrist"]),
+      openness: s.openness,
+      isFist: s.isFist,
+      extend: s.extend,
+    }));
+  }
+
   /** Posición de mundo de una articulación, o null si no está trackeada. */
   _joint(joints, name, out) {
     const j = joints[name];
@@ -123,6 +132,7 @@ export class WolverineClaws {
           if (valid >= 3) openness = sum / valid;
         }
       }
+      state.openness = openness;
 
       // Gesto de puño con histéresis para que no parpadee.
       if (openness != null) {

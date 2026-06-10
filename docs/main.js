@@ -10,8 +10,9 @@ import { WolverineClaws } from "./hand-claws.js";
 const GAZE_DWELL = 1.5; // segundos mirando para abrir
 const EYE_HEIGHT = 1.6;
 const RING_RADIUS = 4.2;
+const DEBUG = new URLSearchParams(location.search).has("debug");
 
-let renderer, scene, camera, dolly, xrControls, dust, handClaws;
+let renderer, scene, camera, dolly, xrControls, dust, handClaws, debugHud;
 let cards = [];
 let raycaster, reticle, reticleFill;
 let hoverCard = null, activeCard = null, dwell = 0;
@@ -61,6 +62,9 @@ async function init() {
 
   // Hand tracking: al cerrar el puño surgen garras estilo Wolverine.
   handClaws = new WolverineClaws(renderer, dolly, scene);
+
+  // HUD de diagnóstico en VR (agregar ?debug a la URL para activarlo).
+  if (DEBUG) debugHud = buildDebugHud();
 
   setupDesktopControls();
   window.addEventListener("resize", onResize);
@@ -200,6 +204,7 @@ function animate() {
   if (renderer.xr.isPresenting) {
     xrControls.update(dt);
     if (handClaws) handClaws.update(dt);
+    if (debugHud) debugHud.update(t);
   } else {
     updateDesktop(dt);
   }
@@ -245,6 +250,54 @@ function updateDesktop(dt) {
     const rad = Math.hypot(dolly.position.x, dolly.position.z);
     if (rad > 10.5) { dolly.position.x *= 10.5 / rad; dolly.position.z *= 10.5 / rad; }
   }
+}
+
+// ---------- HUD de debug en VR (estado del hand tracking) ----------
+function buildDebugHud() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  const tex = new THREE.CanvasTexture(canvas);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.42, 0.105),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false })
+  );
+  mesh.position.set(0, -0.18, -0.85);
+  mesh.renderOrder = 998;
+  camera.add(mesh);
+
+  let last = 0;
+  return {
+    update(now) {
+      if (now - last < 150) return; // ~6 veces por segundo alcanza
+      last = now;
+
+      ctx.clearRect(0, 0, 512, 128);
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0, 0, 512, 128);
+      ctx.fillStyle = "#9fdc9f";
+      ctx.font = "22px monospace";
+
+      const session = renderer.xr.getSession();
+      const feats = session && session.enabledFeatures;
+      const ht = feats ? (feats.includes("hand-tracking") ? "si" : "NO") : "?";
+      let manos = 0;
+      if (session) for (const s of session.inputSources) if (s.hand) manos++;
+      ctx.fillText(`feature hand-tracking: ${ht}   inputs con mano: ${manos}`, 10, 30);
+
+      const st = handClaws ? handClaws.status() : [];
+      st.forEach((s, i) => {
+        const open = s.openness == null ? "--" : s.openness.toFixed(2);
+        ctx.fillText(
+          `mano${i}: joints ${s.tracked ? "si" : "no"}  apertura ${open}  puño ${s.isFist ? "SI" : "no"}`,
+          10,
+          62 + i * 30
+        );
+      });
+      tex.needsUpdate = true;
+    },
+  };
 }
 
 function hideLoader() {
