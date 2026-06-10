@@ -1,10 +1,16 @@
 // main.js — Entry point. Renderer + WebXR, carga de datos, disposición en anillo,
 // gaze dwell, controles de escritorio (fallback) y loop de animación.
+// Los imports locales llevan ?v=N (subirlo junto con APP_VERSION): el browser
+// cachea cada módulo por separado, y esto fuerza que se refresquen en bloque.
 import * as THREE from "three";
-import { buildScene, buildDust, makeSpotlight, loadPanorama, SANGRE } from "./scene.js";
-import { PersonajeCard } from "./personaje-card.js";
-import { XRControls } from "./xr-controller.js";
-import { WolverineClaws } from "./hand-claws.js";
+import { buildScene, buildDust, makeSpotlight, loadPanorama, SANGRE } from "./scene.js?v=6";
+import { PersonajeCard } from "./personaje-card.js?v=6";
+import { XRControls } from "./xr-controller.js?v=6";
+import { WolverineClaws } from "./hand-claws.js?v=6";
+
+// Subir en cada deploy: se muestra en el HUD de debug y en el hint del lobby
+// para detectar al instante si el browser está sirviendo una versión cacheada.
+const APP_VERSION = "v6 — garras cuchilla";
 
 const GAZE_DWELL = 1.5; // segundos mirando para abrir
 const EYE_HEIGHT = 1.6;
@@ -72,6 +78,10 @@ async function init() {
 
   setupDesktopControls();
   window.addEventListener("resize", onResize);
+
+  console.log(`BBN Gallery ${APP_VERSION}`);
+  const hint = document.getElementById("info-hint");
+  if (hint) hint.textContent += ` · ${APP_VERSION}`;
 
   await loadPersonajes();
 
@@ -511,7 +521,7 @@ function buildDebugHud() {
       const ht = feats ? (feats.includes("hand-tracking") ? "si" : "NO") : "?";
       let manos = 0;
       if (session) for (const s of session.inputSources) if (s.hand) manos++;
-      ctx.fillText(`feature hand-tracking: ${ht}   inputs con mano: ${manos}`, 10, 30);
+      ctx.fillText(`${APP_VERSION} | manos: feature ${ht}, inputs ${manos}`, 10, 30);
 
       const st = handClaws ? handClaws.status() : [];
       st.forEach((s, i) => {
