@@ -14,6 +14,11 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 
+    /* Contenedor que entra en fullscreen: lleva el aspect-ratio de la imagen
+       para que el browser del Quest redimensione la ventana al ratio correcto
+       (igual que hace con los videos de Netflix). */
+    #app { position: fixed; inset: 0; background: #000; }
+
     /* --- La foto --- */
     #photo {
       position: fixed; inset: 0;
@@ -130,6 +135,7 @@
   </style>
 </head>
 <body>
+  <div id="app">
   <img id="photo" alt="" />
   <div id="frame"></div>
 
@@ -158,8 +164,10 @@
   </div>
 
   <div id="toast"></div>
+  </div><!-- /app -->
 
   <script>
+    const app = document.getElementById("app");
     const photo = document.getElementById("photo");
     const empty = document.getElementById("empty");
     const bar = document.getElementById("bar");
@@ -181,6 +189,11 @@
       photo.onload = () => {
         photo.style.display = "block";
         empty.style.display = "none";
+        // El ratio de la imagen pasa al contenedor de fullscreen: el browser
+        // del Quest ajusta la ventana a ese ratio al entrar en pantalla completa.
+        if (photo.naturalWidth && photo.naturalHeight) {
+          app.style.aspectRatio = `${photo.naturalWidth} / ${photo.naturalHeight}`;
+        }
         if (persist) {
           // Las data-URL de imágenes grandes pueden exceder localStorage: tolerar.
           try { localStorage.setItem(STORE_KEY, src); }
@@ -340,7 +353,7 @@
     fsBtn.addEventListener("click", async () => {
       try {
         if (document.fullscreenElement) await document.exitFullscreen();
-        else await document.documentElement.requestFullscreen();
+        else await app.requestFullscreen();
       } catch (_) {
         say("No se pudo entrar en pantalla completa");
       }
@@ -355,18 +368,37 @@
     function pokeUI() {
       bar.classList.remove("hidden");
       clearTimeout(hideTimer);
-      // Solo se esconden si hay foto y no se está tipeando en el input.
       hideTimer = setTimeout(() => {
-        if (
-          photo.style.display === "block" &&
-          document.activeElement !== urlInput &&
-          !framePanel.classList.contains("open")
-        ) {
-          bar.classList.add("hidden");
-        }
+        // Queda visible solo si: no hay foto, se está tipeando, el panel de
+        // marcos está abierto, o el puntero está apuntando a la barra misma.
+        const keep =
+          photo.style.display !== "block" ||
+          document.activeElement === urlInput ||
+          framePanel.classList.contains("open") ||
+          bar.matches(":hover");
+        if (!keep) bar.classList.add("hidden");
+        else pokeUI(); // reevaluar más tarde (p.ej. cuando dejen de apuntarle)
       }, 3500);
     }
-    ["pointermove", "pointerdown", "keydown", "touchstart"].forEach((ev) =>
+
+    // El láser del controller emite pointermove continuos por el temblor
+    // natural de la mano: solo cuenta como actividad si se movió en serio.
+    let lastPX = null, lastPY = null;
+    window.addEventListener(
+      "pointermove",
+      (e) => {
+        if (lastPX !== null) {
+          const d = Math.hypot(e.clientX - lastPX, e.clientY - lastPY);
+          lastPX = e.clientX; lastPY = e.clientY;
+          if (d < 18) return; // jitter: ignorar
+        } else {
+          lastPX = e.clientX; lastPY = e.clientY;
+        }
+        pokeUI();
+      },
+      { passive: true }
+    );
+    ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
       window.addEventListener(ev, pokeUI, { passive: true })
     );
     urlInput.addEventListener("blur", pokeUI);
