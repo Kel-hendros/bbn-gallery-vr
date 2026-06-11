@@ -24,6 +24,31 @@
     }
     #photo.fill { object-fit: cover; }
 
+    /* --- Marco decorativo (overlay sobre la foto, no tapa los controles) --- */
+    #frame {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 2;
+      --fc: #b8954b; /* color del marco */
+    }
+    #frame.f-simple { border: 16px solid var(--fc); }
+    #frame.f-sombra {
+      box-shadow: inset 0 0 70px 22px rgba(0, 0, 0, 0.85);
+    }
+    #frame.f-bisel {
+      border: 18px solid var(--fc);
+      /* luz arriba/izquierda y sombra abajo/derecha simulan el bisel */
+      box-shadow:
+        inset 2px 2px 0 rgba(255, 255, 255, 0.28),
+        inset -2px -2px 0 rgba(0, 0, 0, 0.55),
+        inset 0 0 26px rgba(0, 0, 0, 0.45);
+    }
+    #frame.f-galeria { border: 24px solid var(--fc); }
+    #frame.f-galeria::before {
+      /* línea interior fina, como paspartú de galería */
+      content: ""; position: absolute; inset: 8px;
+      border: 2px solid var(--fc); opacity: 0.65;
+    }
+
     /* --- Estado vacío --- */
     #empty {
       position: fixed; inset: 0;
@@ -71,6 +96,28 @@
     button:hover { background: var(--sangre); }
     button.icon { font-size: 1.15rem; padding: 8px 13px; line-height: 1; }
 
+    /* --- Panel de configuración del marco --- */
+    #framePanel {
+      position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+      display: none; flex-direction: column; gap: 12px;
+      padding: 14px 16px; border: 1px solid rgba(184, 149, 75, 0.55);
+      border-radius: 10px; background: rgba(8, 6, 4, 0.92);
+      backdrop-filter: blur(6px); z-index: 5;
+    }
+    #framePanel.open { display: flex; }
+    #framePanel .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    #framePanel .label {
+      font-family: "Cinzel", serif; font-size: 0.7rem; letter-spacing: 0.14em;
+      color: #6e5e3e; text-align: center;
+    }
+    #framePanel button.style { font-size: 0.78rem; padding: 8px 12px; }
+    #framePanel button.active { background: var(--sangre); border-color: var(--hueso); }
+    #framePanel .swatch {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 2px solid rgba(217, 199, 163, 0.35); padding: 0;
+    }
+    #framePanel .swatch.active { border-color: #fff; transform: scale(1.12); }
+
     /* --- Aviso flotante (errores / confirmaciones) --- */
     #toast {
       position: fixed; left: 50%; top: 24px; transform: translateX(-50%);
@@ -84,6 +131,7 @@
 </head>
 <body>
   <img id="photo" alt="" />
+  <div id="frame"></div>
 
   <div id="empty">
     <div class="t">Wallphoto</div>
@@ -98,7 +146,15 @@
     <button id="load">Cargar</button>
     <button id="paste">Pegar</button>
     <button id="fit" class="icon" title="Ajustar / llenar">◱</button>
+    <button id="frameBtn" class="icon" title="Marco">▣</button>
     <button id="fs" class="icon" title="Pantalla completa">⛶</button>
+  </div>
+
+  <div id="framePanel">
+    <div class="label">ESTILO</div>
+    <div class="row" id="frameStyles"></div>
+    <div class="label">COLOR</div>
+    <div class="row" id="frameColors"></div>
   </div>
 
   <div id="toast"></div>
@@ -112,6 +168,8 @@
 
     const STORE_KEY = "wallphoto-src";
     const STORE_FIT = "wallphoto-fill";
+    const STORE_FRAME = "wallphoto-frame";
+    const STORE_COLOR = "wallphoto-color";
 
     // ---------- Mostrar imagen ----------
     function show(src, { persist = true } = {}) {
@@ -217,6 +275,66 @@
       say(photo.classList.contains("fill") ? "Llenar pantalla (recorta)" : "Ajustar entera");
     });
 
+    // ---------- Marcos ----------
+    const frame = document.getElementById("frame");
+    const framePanel = document.getElementById("framePanel");
+
+    const FRAME_STYLES = [
+      { id: "", nombre: "Sin marco" },
+      { id: "f-simple", nombre: "Simple" },
+      { id: "f-sombra", nombre: "Sombra" },
+      { id: "f-bisel", nombre: "Bisel" },
+      { id: "f-galeria", nombre: "Galería" },
+    ];
+    const FRAME_COLORS = [
+      { hex: "#b8954b", nombre: "Oro" },
+      { hex: "#7a0c12", nombre: "Sangre" },
+      { hex: "#d9c7a3", nombre: "Hueso" },
+      { hex: "#111111", nombre: "Negro" },
+      { hex: "#f2efe8", nombre: "Blanco" },
+      { hex: "#b9bec6", nombre: "Plata" },
+    ];
+
+    function applyFrame(styleId, colorHex) {
+      frame.className = styleId;
+      frame.style.setProperty("--fc", colorHex);
+      try {
+        localStorage.setItem(STORE_FRAME, styleId);
+        localStorage.setItem(STORE_COLOR, colorHex);
+      } catch (_) {}
+      // Refrescar el resaltado de los botones del panel.
+      document.querySelectorAll("#frameStyles button").forEach((b) =>
+        b.classList.toggle("active", b.dataset.id === styleId)
+      );
+      document.querySelectorAll("#frameColors button").forEach((b) =>
+        b.classList.toggle("active", b.dataset.hex === colorHex)
+      );
+    }
+
+    const stylesRow = document.getElementById("frameStyles");
+    for (const s of FRAME_STYLES) {
+      const b = document.createElement("button");
+      b.className = "style";
+      b.dataset.id = s.id;
+      b.textContent = s.nombre;
+      b.addEventListener("click", () => applyFrame(s.id, frame.style.getPropertyValue("--fc") || "#b8954b"));
+      stylesRow.appendChild(b);
+    }
+    const colorsRow = document.getElementById("frameColors");
+    for (const c of FRAME_COLORS) {
+      const b = document.createElement("button");
+      b.className = "swatch";
+      b.dataset.hex = c.hex;
+      b.title = c.nombre;
+      b.style.background = c.hex;
+      b.addEventListener("click", () => applyFrame(frame.className, c.hex));
+      colorsRow.appendChild(b);
+    }
+
+    document.getElementById("frameBtn").addEventListener("click", () => {
+      framePanel.classList.toggle("open");
+    });
+
     // ---------- Pantalla completa ----------
     const fsBtn = document.getElementById("fs");
     fsBtn.addEventListener("click", async () => {
@@ -239,7 +357,11 @@
       clearTimeout(hideTimer);
       // Solo se esconden si hay foto y no se está tipeando en el input.
       hideTimer = setTimeout(() => {
-        if (photo.style.display === "block" && document.activeElement !== urlInput) {
+        if (
+          photo.style.display === "block" &&
+          document.activeElement !== urlInput &&
+          !framePanel.classList.contains("open")
+        ) {
           bar.classList.add("hidden");
         }
       }, 3500);
@@ -250,9 +372,13 @@
     urlInput.addEventListener("blur", pokeUI);
     pokeUI();
 
-    // ---------- Restaurar última imagen ----------
+    // ---------- Restaurar última imagen y marco ----------
     try {
       if (localStorage.getItem(STORE_FIT)) photo.classList.add("fill");
+      applyFrame(
+        localStorage.getItem(STORE_FRAME) || "",
+        localStorage.getItem(STORE_COLOR) || "#b8954b"
+      );
       const saved = localStorage.getItem(STORE_KEY);
       if (saved) show(saved, { persist: false });
     } catch (_) {}
