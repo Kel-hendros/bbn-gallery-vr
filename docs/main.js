@@ -3,14 +3,14 @@
 // Los imports locales llevan ?v=N (subirlo junto con APP_VERSION): el browser
 // cachea cada módulo por separado, y esto fuerza que se refresquen en bloque.
 import * as THREE from "three";
-import { buildScene, buildDust, makeSpotlight, loadPanorama, SANGRE } from "./scene.js?v=6";
-import { PersonajeCard } from "./personaje-card.js?v=6";
-import { XRControls } from "./xr-controller.js?v=6";
-import { WolverineClaws } from "./hand-claws.js?v=6";
+import { buildScene, buildDust, makeSpotlight, loadPanorama, SANGRE } from "./scene.js?v=7";
+import { PersonajeCard } from "./personaje-card.js?v=7";
+import { XRControls } from "./xr-controller.js?v=7";
+import { WolverineClaws } from "./hand-claws.js?v=7";
 
 // Subir en cada deploy: se muestra en el HUD de debug y en el hint del lobby
 // para detectar al instante si el browser está sirviendo una versión cacheada.
-const APP_VERSION = "v6 — garras cuchilla";
+const APP_VERSION = "v7 — garras al dorso";
 
 const GAZE_DWELL = 1.5; // segundos mirando para abrir
 const EYE_HEIGHT = 1.6;

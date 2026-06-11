@@ -13,7 +13,10 @@ const FIST_CLOSE = 0.55; // por debajo de esto: puño cerrado → salen las garr
 const FIST_OPEN = 0.78;  // por encima: mano abierta → se retraen
 
 const EXTEND_SPEED = 13;  // qué tan rápido salen/entran las garras
-const FORWARD_OFFSET = 0.02; // las garras nacen un poco más allá de los nudillos
+// Anclaje de la base de las garras respecto del centro de los nudillos:
+// hacia atrás (negativo = hacia la muñeca) y apenas por encima del dorso.
+const FORWARD_OFFSET = -0.045;
+const UP_OFFSET = 0.012;
 
 export class WolverineClaws {
   /**
@@ -60,7 +63,11 @@ export class WolverineClaws {
         hand, claws, spheres,
         meshModel: null, meshLoaded: false, modelsVisible: true,
         extend: 0, isFist: false, openness: null,
+        handedness: null,
       };
+      hand.addEventListener("connected", (e) => {
+        if (e.data) state.handedness = e.data.handedness;
+      });
       const meshFactory = new XRHandModelFactory(null, () => {
         state.meshLoaded = true;
         spheres.visible = false;
@@ -84,13 +91,14 @@ export class WolverineClaws {
       emissiveIntensity: 0.22,
     });
 
-    // Tres garras paralelas sobre los nudillos. La del medio, más larga.
-    const lengths = [0.21, 0.25, 0.21];
+    // Tres garras paralelas del mismo largo, saliendo del dorso de la mano.
+    const BLADE_LENGTH = 0.22;
     const xs = [-0.024, 0.0, 0.024];
     const splay = [-0.1, 0.0, 0.1]; // leve abanico hacia afuera
 
+    const bladeGeo = this._bladeGeometry(BLADE_LENGTH);
     for (let k = 0; k < 3; k++) {
-      const blade = new THREE.Mesh(this._bladeGeometry(lengths[k]), steel);
+      const blade = new THREE.Mesh(bladeGeo, steel);
       blade.position.set(xs[k], 0, 0);
       blade.rotation.y = splay[k];
       group.add(blade);
@@ -214,12 +222,18 @@ export class WolverineClaws {
         // Base ortonormal: +Z hacia donde apuntan los dedos, +X a lo ancho.
         const fwd = t.fwd.copy(center).sub(wrist).normalize();
         const side = t.side.copy(idxK).sub(pnkK).normalize();
+        // En la mano izquierda el vector índice→meñique queda espejado:
+        // se invierte para que `up` apunte siempre al dorso, no a la palma.
+        if (state.handedness === "left") side.negate();
         const up = t.up.crossVectors(fwd, side).normalize();
         side.crossVectors(up, fwd).normalize();
 
         t.m.makeBasis(side, up, fwd);
         claws.quaternion.setFromRotationMatrix(t.m);
-        claws.position.copy(center).addScaledVector(fwd, FORWARD_OFFSET);
+        claws.position
+          .copy(center)
+          .addScaledVector(fwd, FORWARD_OFFSET)
+          .addScaledVector(up, UP_OFFSET);
       }
 
       // El "scale.z" hace que las garras parezcan deslizarse hacia afuera.
