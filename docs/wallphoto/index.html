@@ -72,7 +72,8 @@
     /* --- Barra de controles (se auto-oculta como Netflix) --- */
     #bar {
       position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
-      display: flex; gap: 10px; align-items: center;
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 10px; align-items: center;
       padding: 12px 16px; border: 1px solid rgba(184, 149, 75, 0.55);
       border-radius: 10px; background: rgba(8, 6, 4, 0.82);
       backdrop-filter: blur(6px);
@@ -83,7 +84,8 @@
     #bar.hidden { opacity: 0; pointer-events: none; }
 
     #url {
-      width: min(420px, 48vw); padding: 10px 12px;
+      flex: 1 1 200px; min-width: 150px; max-width: 420px;
+      padding: 10px 12px;
       border: 1px solid #3a2f1d; border-radius: 6px;
       background: #120e0a; color: var(--hueso);
       font-family: "EB Garamond", serif; font-size: 1rem;
