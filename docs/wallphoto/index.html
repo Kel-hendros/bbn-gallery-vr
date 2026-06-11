@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wallphoto — Buenos Aires by Night</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet" />
+
+  <style>
+    :root { --sangre: #7a0c12; --oro: #b8954b; --hueso: #d9c7a3; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+
+    /* --- La foto --- */
+    #photo {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain; /* "fill" lo cambia a cover */
+      display: none;
+      background: #000;
+    }
+    #photo.fill { object-fit: cover; }
+
+    /* --- Estado vacío --- */
+    #empty {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; gap: 0.8rem;
+      align-items: center; justify-content: center;
+      color: var(--hueso); font-family: "Cinzel", serif;
+      letter-spacing: 0.12em; text-align: center; padding: 2rem;
+    }
+    #empty .t { font-size: clamp(1.1rem, 3.5vw, 1.6rem); opacity: 0.9; }
+    #empty .s {
+      font-family: "EB Garamond", serif; font-style: italic;
+      font-size: 0.95rem; color: #6e5e3e; letter-spacing: 0.05em;
+      max-width: 34rem; line-height: 1.5;
+    }
+
+    /* --- Barra de controles (se auto-oculta como Netflix) --- */
+    #bar {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      display: flex; gap: 10px; align-items: center;
+      padding: 12px 16px; border: 1px solid rgba(184, 149, 75, 0.55);
+      border-radius: 10px; background: rgba(8, 6, 4, 0.82);
+      backdrop-filter: blur(6px);
+      transition: opacity 0.5s ease;
+      max-width: calc(100vw - 32px);
+      z-index: 5;
+    }
+    #bar.hidden { opacity: 0; pointer-events: none; }
+
+    #url {
+      width: min(420px, 48vw); padding: 10px 12px;
+      border: 1px solid #3a2f1d; border-radius: 6px;
+      background: #120e0a; color: var(--hueso);
+      font-family: "EB Garamond", serif; font-size: 1rem;
+      outline: none;
+    }
+    #url:focus { border-color: var(--oro); }
+    #url::placeholder { color: #5c4f38; }
+
+    button {
+      padding: 10px 14px; border: 1px solid var(--oro); border-radius: 6px;
+      background: rgba(0, 0, 0, 0.5); color: var(--hueso);
+      font-family: "Cinzel", serif; font-size: 0.85rem; letter-spacing: 0.08em;
+      cursor: pointer; white-space: nowrap;
+    }
+    button:hover { background: var(--sangre); }
+    button.icon { font-size: 1.15rem; padding: 8px 13px; line-height: 1; }
+
+    /* --- Aviso flotante (errores / confirmaciones) --- */
+    #toast {
+      position: fixed; left: 50%; top: 24px; transform: translateX(-50%);
+      padding: 10px 18px; border-radius: 8px;
+      background: rgba(8, 6, 4, 0.9); border: 1px solid var(--sangre);
+      color: var(--hueso); font-family: "EB Garamond", serif; font-size: 0.95rem;
+      opacity: 0; transition: opacity 0.4s ease; pointer-events: none; z-index: 6;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <img id="photo" alt="" />
+
+  <div id="empty">
+    <div class="t">Wallphoto</div>
+    <div class="s">
+      Pegá una imagen o una URL (Ctrl+V), o escribila abajo y tocá Cargar.
+      Después: Pantalla completa, y anclá la ventana donde quieras.
+    </div>
+  </div>
+
+  <div id="bar">
+    <input id="url" type="url" placeholder="https://…  (o pegá una imagen con Ctrl+V)" />
+    <button id="load">Cargar</button>
+    <button id="paste">Pegar</button>
+    <button id="fit" class="icon" title="Ajustar / llenar">◱</button>
+    <button id="fs" class="icon" title="Pantalla completa">⛶</button>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const photo = document.getElementById("photo");
+    const empty = document.getElementById("empty");
+    const bar = document.getElementById("bar");
+    const urlInput = document.getElementById("url");
+    const toast = document.getElementById("toast");
+
+    const STORE_KEY = "wallphoto-src";
+    const STORE_FIT = "wallphoto-fill";
+
+    // ---------- Mostrar imagen ----------
+    function show(src, { persist = true } = {}) {
+      photo.onerror = () => {
+        photo.style.display = "none";
+        empty.style.display = "flex";
+        say("No se pudo cargar esa imagen");
+      };
+      photo.onload = () => {
+        photo.style.display = "block";
+        empty.style.display = "none";
+        if (persist) {
+          // Las data-URL de imágenes grandes pueden exceder localStorage: tolerar.
+          try { localStorage.setItem(STORE_KEY, src); }
+          catch (_) { say("Imagen muy grande para recordarla entre sesiones"); }
+        }
+      };
+      photo.src = src;
+    }
+
+    function say(msg) {
+      toast.textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(say._t);
+      say._t = setTimeout(() => toast.classList.remove("show"), 2600);
+    }
+
+    // ---------- Cargar por URL ----------
+    function loadFromInput() {
+      const v = urlInput.value.trim();
+      if (!v) return;
+      show(v);
+      urlInput.blur();
+    }
+    document.getElementById("load").addEventListener("click", loadFromInput);
+    urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") loadFromInput(); });
+
+    // ---------- Paste (Ctrl+V en cualquier parte de la página) ----------
+    window.addEventListener("paste", (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (items) {
+        for (const it of items) {
+          if (it.type.startsWith("image/")) {
+            const file = it.getAsFile();
+            const r = new FileReader();
+            r.onload = () => show(r.result);
+            r.readAsDataURL(file);
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+      // Sin imagen en el portapapeles: si es texto con pinta de URL, cargarlo
+      // (salvo que se esté pegando dentro del input, que sigue su curso normal).
+      if (e.target === urlInput) return;
+      const text = e.clipboardData && e.clipboardData.getData("text");
+      if (text && /^https?:\/\//i.test(text.trim())) show(text.trim());
+    });
+
+    // ---------- Botón Pegar (clipboard API, por si no hay teclado a mano) ----------
+    document.getElementById("paste").addEventListener("click", async () => {
+      try {
+        if (navigator.clipboard && navigator.clipboard.read) {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            const imgType = item.types.find((t) => t.startsWith("image/"));
+            if (imgType) {
+              const blob = await item.getType(imgType);
+              const r = new FileReader();
+              r.onload = () => show(r.result);
+              r.readAsDataURL(blob);
+              return;
+            }
+          }
+        }
+        const text = await navigator.clipboard.readText();
+        if (text && /^https?:\/\//i.test(text.trim())) { show(text.trim()); return; }
+        say("No hay imagen ni URL en el portapapeles");
+      } catch (_) {
+        say("El navegador no dio acceso al portapapeles — usá Ctrl+V");
+      }
+    });
+
+    // ---------- Arrastrar y soltar ----------
+    window.addEventListener("dragover", (e) => e.preventDefault());
+    window.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f && f.type.startsWith("image/")) {
+        const r = new FileReader();
+        r.onload = () => show(r.result);
+        r.readAsDataURL(f);
+        return;
+      }
+      const text = e.dataTransfer.getData("text");
+      if (text && /^https?:\/\//i.test(text.trim())) show(text.trim());
+    });
+
+    // ---------- Ajustar / llenar ----------
+    document.getElementById("fit").addEventListener("click", () => {
+      photo.classList.toggle("fill");
+      try { localStorage.setItem(STORE_FIT, photo.classList.contains("fill") ? "1" : ""); } catch (_) {}
+      say(photo.classList.contains("fill") ? "Llenar pantalla (recorta)" : "Ajustar entera");
+    });
+
+    // ---------- Pantalla completa ----------
+    const fsBtn = document.getElementById("fs");
+    fsBtn.addEventListener("click", async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+      } catch (_) {
+        say("No se pudo entrar en pantalla completa");
+      }
+    });
+    document.addEventListener("fullscreenchange", () => {
+      fsBtn.textContent = document.fullscreenElement ? "🗗" : "⛶";
+      pokeUI();
+    });
+
+    // ---------- Auto-ocultar controles (estilo Netflix) ----------
+    let hideTimer = null;
+    function pokeUI() {
+      bar.classList.remove("hidden");
+      clearTimeout(hideTimer);
+      // Solo se esconden si hay foto y no se está tipeando en el input.
+      hideTimer = setTimeout(() => {
+        if (photo.style.display === "block" && document.activeElement !== urlInput) {
+          bar.classList.add("hidden");
+        }
+      }, 3500);
+    }
+    ["pointermove", "pointerdown", "keydown", "touchstart"].forEach((ev) =>
+      window.addEventListener(ev, pokeUI, { passive: true })
+    );
+    urlInput.addEventListener("blur", pokeUI);
+    pokeUI();
+
+    // ---------- Restaurar última imagen ----------
+    try {
+      if (localStorage.getItem(STORE_FIT)) photo.classList.add("fill");
+      const saved = localStorage.getItem(STORE_KEY);
+      if (saved) show(saved, { persist: false });
+    } catch (_) {}
+  </script>
+</body>
+</html>
